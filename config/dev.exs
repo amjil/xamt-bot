@@ -38,6 +38,9 @@ config :xamt_bot, XamtBot.Events.Signature,
   timestamp_tolerance_seconds:
     String.to_integer(System.get_env("WEBHOOK_TIMESTAMP_TOLERANCE") || "300")
 
+# Local ops browsing. Override with OPS_TOKEN in the environment.
+config :xamt_bot, ops_token: System.get_env("OPS_TOKEN") || "dev-ops-token"
+
 # ## SSL Support
 #
 # In order to use HTTPS in development, a self-signed

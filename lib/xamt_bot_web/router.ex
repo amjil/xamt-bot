@@ -14,6 +14,10 @@ defmodule XamtBotWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :ops_auth do
+    plug XamtBotWeb.Plugs.OpsAuth
+  end
+
   scope "/", XamtBotWeb do
     pipe_through :browser
 
@@ -25,5 +29,16 @@ defmodule XamtBotWeb.Router do
 
     get "/health", HealthController, :show
     post "/webhooks/xamt/:external_bot_id", WebhookController, :xamt
+  end
+
+  # Read-only ops surface. Requires OPS_TOKEN / :ops_token; otherwise 404.
+  scope "/ops", XamtBotWeb do
+    pipe_through [:api, :ops_auth]
+
+    get "/bots", OpsController, :bots
+    get "/bots/:id", OpsController, :show_bot
+    get "/events", OpsController, :events
+    get "/events/:id", OpsController, :show_event
+    get "/executions", OpsController, :executions
   end
 end

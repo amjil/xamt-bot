@@ -37,6 +37,10 @@ if concurrency = System.get_env("OBAN_QUEUE_CONCURRENCY") do
   config :xamt_bot, Oban, queues: [bot_events: String.to_integer(concurrency)]
 end
 
+if ops_token = System.get_env("OPS_TOKEN") do
+  config :xamt_bot, ops_token: ops_token
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

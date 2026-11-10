@@ -31,6 +31,8 @@ config :xamt_bot, XamtBot.Clients.XamtClient,
 
 config :xamt_bot, XamtBot.Events.Signature, timestamp_tolerance_seconds: 300
 
+config :xamt_bot, ops_token: "test-ops-token"
+
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 

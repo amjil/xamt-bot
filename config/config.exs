@@ -9,7 +9,8 @@ import Config
 
 config :xamt_bot,
   ecto_repos: [XamtBot.Repo],
-  generators: [timestamp_type: :utc_datetime_usec, binary_id: true]
+  generators: [timestamp_type: :utc_datetime_usec, binary_id: true],
+  ops_token: nil
 
 config :xamt_bot, Oban,
   repo: XamtBot.Repo,
