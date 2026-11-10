@@ -17,10 +17,10 @@ config :xamt_bot, XamtBot.Repo,
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
 config :xamt_bot, XamtBotWeb.Endpoint,
-  # Binding to loopback ipv4 address prevents access from other machines.
-  # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
+  # Bind all interfaces so LAN devices can reach the dev server.
+  # Use `ip: {127, 0, 0, 1}` to restrict to localhost only.
   # Port 4001 avoids colliding with the Xamt main app (usually :4000).
-  http: [ip: {127, 0, 0, 1}, port: 4001],
+  http: [ip: {0, 0, 0, 0}, port: 4001],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
