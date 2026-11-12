@@ -34,8 +34,11 @@ defmodule XamtBot.Events do
 
   def get_event!(id), do: Repo.get!(EventInbox, id)
 
-  def get_by_external_id(external_event_id) do
-    Repo.get_by(EventInbox, external_event_id: external_event_id)
+  def get_by_external_id(bot_instance_id, external_event_id) do
+    Repo.get_by(EventInbox,
+      bot_instance_id: bot_instance_id,
+      external_event_id: external_event_id
+    )
   end
 
   def mark_processing(%EventInbox{} = event) do
@@ -111,7 +114,7 @@ defmodule XamtBot.Events do
 
       {:error, :event, %Ecto.Changeset{errors: errors} = changeset, _} ->
         if unique_event_conflict?(errors) do
-          {:ok, :duplicate, get_by_external_id(external_event_id)}
+          {:ok, :duplicate, get_by_external_id(bot.id, external_event_id)}
         else
           {:error, changeset}
         end
@@ -128,7 +131,7 @@ defmodule XamtBot.Events do
 
   defp unique_event_conflict?(errors) do
     Enum.any?(errors, fn
-      {:external_event_id, {_, opts}} -> opts[:constraint] == :unique
+      {_field, {_, opts}} -> opts[:constraint] == :unique
       _ -> false
     end)
   end

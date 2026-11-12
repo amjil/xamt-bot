@@ -39,10 +39,11 @@ defmodule XamtBot.Repo.Migrations.CreateBotRuntimeTables do
       timestamps(type: :utc_datetime_usec)
     end
 
-    create unique_index(:event_inbox, [:external_event_id])
+    create unique_index(:event_inbox, [:bot_instance_id, :external_event_id])
     create index(:event_inbox, [:bot_instance_id])
     create index(:event_inbox, [:status])
     create index(:event_inbox, [:event_type])
+    create index(:event_inbox, [:received_at])
 
     create table(:bot_execution_logs, primary_key: false) do
       add :id, :binary_id, primary_key: true
@@ -66,6 +67,7 @@ defmodule XamtBot.Repo.Migrations.CreateBotRuntimeTables do
     create index(:bot_execution_logs, [:bot_instance_id])
     create index(:bot_execution_logs, [:event_inbox_id])
     create index(:bot_execution_logs, [:status])
+    create index(:bot_execution_logs, [:started_at])
 
     create table(:outbound_requests, primary_key: false) do
       add :id, :binary_id, primary_key: true

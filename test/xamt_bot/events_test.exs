@@ -44,6 +44,24 @@ defmodule XamtBot.EventsTest do
     assert length(all_enqueued(worker: XamtBot.Workers.EventProcessor)) == 1
   end
 
+  test "accept_delivery allows the same external event id for different bots", %{bot: bot} do
+    other_bot = Fixtures.bot_instance_fixture()
+    event_id = Ecto.UUID.generate()
+
+    attrs = %{
+      external_event_id: event_id,
+      event_type: "message.created",
+      payload: Fixtures.message_created_payload(event_id: event_id)
+    }
+
+    assert {:ok, :queued, first} = Events.accept_delivery(bot, attrs)
+    assert {:ok, :queued, second} = Events.accept_delivery(other_bot, attrs)
+    assert first.id != second.id
+    assert first.bot_instance_id == bot.id
+    assert second.bot_instance_id == other_bot.id
+    assert length(all_enqueued(worker: XamtBot.Workers.EventProcessor)) == 2
+  end
+
   test "accept_delivery rejects disabled bots", %{bot: bot} do
     {:ok, bot} = XamtBot.Bots.update_instance(bot, %{"status" => "disabled"})
     event_id = Ecto.UUID.generate()

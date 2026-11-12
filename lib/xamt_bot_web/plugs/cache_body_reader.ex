@@ -5,9 +5,22 @@ defmodule XamtBotWeb.Plugs.CacheBodyReader do
   """
 
   def read_body(conn, opts) do
-    {:ok, body, conn} = Plug.Conn.read_body(conn, opts)
+    case Plug.Conn.read_body(conn, opts) do
+      {:ok, body, conn} ->
+        conn = append_raw_body(conn, body)
+        {:ok, body, conn}
+
+      {:more, body, conn} ->
+        conn = append_raw_body(conn, body)
+        {:more, body, conn}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp append_raw_body(conn, chunk) do
     existing = Map.get(conn.assigns, :raw_body, "")
-    conn = Plug.Conn.assign(conn, :raw_body, existing <> body)
-    {:ok, body, conn}
+    Plug.Conn.assign(conn, :raw_body, existing <> chunk)
   end
 end

@@ -11,7 +11,10 @@ defmodule XamtBot.Bots do
   def get_instance!(id), do: Repo.get!(BotInstance, id)
 
   def get_instance_by_external_id(external_bot_id) when is_binary(external_bot_id) do
-    Repo.get_by(BotInstance, external_bot_id: external_bot_id)
+    case Ecto.UUID.cast(external_bot_id) do
+      {:ok, uuid} -> Repo.get_by(BotInstance, external_bot_id: uuid)
+      :error -> nil
+    end
   end
 
   def list_instances(opts \\ []) do

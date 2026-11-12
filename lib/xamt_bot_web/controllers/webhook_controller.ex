@@ -74,9 +74,11 @@ defmodule XamtBotWeb.WebhookController do
   end
 
   defp fetch_bot(external_bot_id) do
-    case Bots.get_instance_by_external_id(external_bot_id) do
-      nil -> {:error, :not_found}
-      bot -> {:ok, bot}
+    with {:ok, valid_uuid} <- Ecto.UUID.cast(external_bot_id),
+         %Bots.BotInstance{} = bot <- Bots.get_instance_by_external_id(valid_uuid) do
+      {:ok, bot}
+    else
+      _ -> {:error, :not_found}
     end
   end
 
@@ -89,28 +91,16 @@ defmodule XamtBotWeb.WebhookController do
     end
   end
 
-  defp decode_payload(conn, raw_body) do
-    cond do
-      is_map(conn.body_params) and map_size(conn.body_params) > 0 ->
-        {:ok, stringify_payload(conn.body_params)}
+  defp decode_payload(_conn, "") do
+    {:ok, %{}}
+  end
 
-      raw_body == "" ->
-        {:ok, %{}}
-
-      true ->
-        case Jason.decode(raw_body) do
-          {:ok, map} when is_map(map) -> {:ok, map}
-          _ -> {:error, :invalid_json}
-        end
+  defp decode_payload(_conn, raw_body) when is_binary(raw_body) do
+    case Jason.decode(raw_body) do
+      {:ok, map} when is_map(map) -> {:ok, map}
+      _ -> {:error, :invalid_json}
     end
   end
-
-  defp stringify_payload(map) when is_map(map) do
-    Map.new(map, fn {k, v} -> {to_string(k), stringify_payload(v)} end)
-  end
-
-  defp stringify_payload(list) when is_list(list), do: Enum.map(list, &stringify_payload/1)
-  defp stringify_payload(other), do: other
 
   defp first_header(conn, name) do
     case get_req_header(conn, name) do

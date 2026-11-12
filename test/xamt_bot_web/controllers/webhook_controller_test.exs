@@ -31,6 +31,19 @@ defmodule XamtBotWeb.WebhookControllerTest do
     assert length(all_enqueued(worker: XamtBot.Workers.EventProcessor)) == 1
   end
 
+  test "returns 404 for non-uuid external bot ids", %{conn: conn} do
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("x-xamt-timestamp", "1")
+      |> put_req_header("x-xamt-signature-256", "sha256=00")
+      |> put_req_header("x-xamt-delivery", Ecto.UUID.generate())
+      |> put_req_header("x-xamt-event", "message.created")
+      |> post(~p"/webhooks/xamt/not-a-uuid", "{}")
+
+    assert %{"ok" => false, "error" => "bot_not_found"} = json_response(conn, 404)
+  end
+
   test "rejects invalid signatures", %{conn: conn, bot: bot} do
     event_id = Ecto.UUID.generate()
     body = Jason.encode!(Fixtures.message_created_payload(event_id: event_id))

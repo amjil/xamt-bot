@@ -50,7 +50,9 @@ defmodule XamtBot.Events.EventInbox do
       :received_at
     ])
     |> validate_inclusion(:status, @statuses)
-    |> unique_constraint(:external_event_id)
+    |> unique_constraint([:bot_instance_id, :external_event_id],
+      name: :event_inbox_bot_instance_id_external_event_id_index
+    )
     |> foreign_key_constraint(:bot_instance_id)
   end
 end
