@@ -20,9 +20,9 @@ if System.get_env("PHX_SERVER") do
   config :xamt_bot, XamtBotWeb.Endpoint, server: true
 end
 
-# Default port 4001 so local Xamt (:4000) and xamt-bot can run side by side.
+# Default port 4003 so local Xamt (:4000) and xamt-bot can run side by side.
 config :xamt_bot, XamtBotWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4001"))]
+  http: [port: String.to_integer(System.get_env("PORT", "4003"))]
 
 if xamt_base_url = System.get_env("XAMT_BASE_URL") do
   config :xamt_bot, XamtBot.Clients.XamtClient, base_url: xamt_base_url
@@ -83,7 +83,7 @@ if config_env() == :prod do
       # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
       # for details about using IPv6 vs IPv4 and loopback vs public addresses.
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
-      port: String.to_integer(System.get_env("PORT") || "4001")
+      port: String.to_integer(System.get_env("PORT") || "4003")
     ],
     secret_key_base: secret_key_base
 

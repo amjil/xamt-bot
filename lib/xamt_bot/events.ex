@@ -34,6 +34,20 @@ defmodule XamtBot.Events do
 
   def get_event!(id), do: Repo.get!(EventInbox, id)
 
+  def get_event(id) when is_binary(id) do
+    case Ecto.UUID.cast(id) do
+      {:ok, uuid} ->
+        EventInbox
+        |> Repo.get(uuid)
+        |> maybe_preload_bot()
+
+      :error ->
+        nil
+    end
+  end
+
+  def get_event(_), do: nil
+
   def get_by_external_id(bot_instance_id, external_event_id) do
     Repo.get_by(EventInbox,
       bot_instance_id: bot_instance_id,
@@ -81,13 +95,36 @@ defmodule XamtBot.Events do
 
   def list_recent(opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
+    status = Keyword.get(opts, :status)
+    bot_instance_id = Keyword.get(opts, :bot_instance_id)
 
     EventInbox
+    |> maybe_filter_status(status)
+    |> maybe_filter_bot(bot_instance_id)
     |> order_by([e], desc: e.received_at)
     |> limit(^limit)
     |> preload(:bot_instance)
     |> Repo.all()
   end
+
+  defp maybe_preload_bot(nil), do: nil
+  defp maybe_preload_bot(event), do: Repo.preload(event, :bot_instance)
+
+  defp maybe_filter_status(query, nil), do: query
+  defp maybe_filter_status(query, ""), do: query
+  defp maybe_filter_status(query, status), do: from(q in query, where: q.status == ^status)
+
+  defp maybe_filter_bot(query, nil), do: query
+  defp maybe_filter_bot(query, ""), do: query
+
+  defp maybe_filter_bot(query, bot_instance_id) when is_binary(bot_instance_id) do
+    case Ecto.UUID.cast(bot_instance_id) do
+      {:ok, uuid} -> from(q in query, where: q.bot_instance_id == ^uuid)
+      :error -> from(q in query, where: false)
+    end
+  end
+
+  defp maybe_filter_bot(query, _), do: from(q in query, where: false)
 
   defp insert_and_enqueue(bot, external_event_id, event_type, payload) do
     now = DateTime.utc_now()

@@ -20,10 +20,10 @@ defmodule XamtBotWeb.Plugs.OpsAuth do
         |> halt()
 
       expected ->
-        case bearer_token(conn) do
-          ^expected ->
-            conn
-
+        with token when is_binary(token) <- bearer_token(conn),
+             true <- secure_compare(token, expected) do
+          conn
+        else
           _ ->
             conn
             |> put_status(:unauthorized)
@@ -40,10 +40,23 @@ defmodule XamtBotWeb.Plugs.OpsAuth do
     end
   end
 
+  defp secure_compare(a, b) when is_binary(a) and is_binary(b) do
+    byte_size(a) == byte_size(b) and Plug.Crypto.secure_compare(a, b)
+  end
+
   defp bearer_token(conn) do
     case get_req_header(conn, "authorization") do
-      ["Bearer " <> token] -> String.trim(token)
-      _ -> nil
+      [header | _] ->
+        case String.split(header, " ", parts: 2) do
+          [scheme, token] ->
+            if String.downcase(scheme) == "bearer", do: String.trim(token), else: nil
+
+          _ ->
+            nil
+        end
+
+      _ ->
+        nil
     end
   end
 end

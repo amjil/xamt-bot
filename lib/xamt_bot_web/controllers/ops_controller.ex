@@ -1,12 +1,11 @@
 defmodule XamtBotWeb.OpsController do
   use XamtBotWeb, :controller
 
-  import Ecto.Query
-
-  alias XamtBot.Repo
   alias XamtBot.Bots
   alias XamtBot.Bots.BotInstance
+  alias XamtBot.Events
   alias XamtBot.Events.EventInbox
+  alias XamtBot.Audit
   alias XamtBot.Audit.ExecutionLog
 
   def bots(conn, _params) do
@@ -18,7 +17,7 @@ defmodule XamtBotWeb.OpsController do
   end
 
   def show_bot(conn, %{"id" => id}) do
-    case Repo.get(BotInstance, id) do
+    case Bots.get_instance(id) do
       nil ->
         conn |> put_status(:not_found) |> json(%{ok: false, error: "not_found"})
 
@@ -28,23 +27,19 @@ defmodule XamtBotWeb.OpsController do
   end
 
   def events(conn, params) do
-    limit = parse_limit(params["limit"], 50)
-
     events =
-      EventInbox
-      |> maybe_filter_status(params["status"])
-      |> maybe_filter_bot(params["bot_instance_id"])
-      |> order_by([e], desc: e.received_at)
-      |> limit(^limit)
-      |> preload(:bot_instance)
-      |> Repo.all()
+      Events.list_recent(
+        limit: parse_limit(params["limit"], 50),
+        status: params["status"],
+        bot_instance_id: params["bot_instance_id"]
+      )
       |> Enum.map(&serialize_event/1)
 
     json(conn, %{ok: true, data: events})
   end
 
   def show_event(conn, %{"id" => id}) do
-    case Repo.get(EventInbox, id) |> maybe_preload_bot() do
+    case Events.get_event(id) do
       nil ->
         conn |> put_status(:not_found) |> json(%{ok: false, error: "not_found"})
 
@@ -54,15 +49,12 @@ defmodule XamtBotWeb.OpsController do
   end
 
   def executions(conn, params) do
-    limit = parse_limit(params["limit"], 50)
-
     logs =
-      ExecutionLog
-      |> maybe_filter_status(params["status"])
-      |> maybe_filter_bot(params["bot_instance_id"])
-      |> order_by([l], desc: l.started_at)
-      |> limit(^limit)
-      |> Repo.all()
+      Audit.list_executions(
+        limit: parse_limit(params["limit"], 50),
+        status: params["status"],
+        bot_instance_id: params["bot_instance_id"]
+      )
       |> Enum.map(&serialize_execution/1)
 
     json(conn, %{ok: true, data: logs})
@@ -112,30 +104,16 @@ defmodule XamtBotWeb.OpsController do
     }
   end
 
-  defp maybe_preload_bot(nil), do: nil
-  defp maybe_preload_bot(event), do: Repo.preload(event, :bot_instance)
-
-  defp maybe_filter_status(query, nil), do: query
-  defp maybe_filter_status(query, ""), do: query
-  defp maybe_filter_status(query, status), do: from(q in query, where: q.status == ^status)
-
-  defp maybe_filter_bot(query, nil), do: query
-  defp maybe_filter_bot(query, ""), do: query
-
-  defp maybe_filter_bot(query, bot_instance_id),
-    do: from(q in query, where: q.bot_instance_id == ^bot_instance_id)
-
   defp parse_limit(nil, default), do: default
 
   defp parse_limit(value, default) when is_binary(value) do
     case Integer.parse(value) do
-      {n, _} when n > 0 and n <= 200 -> n
+      {n, ""} when n > 0 -> min(n, 200)
       _ -> default
     end
   end
 
-  defp parse_limit(value, _default) when is_integer(value) and value > 0 and value <= 200,
-    do: value
+  defp parse_limit(value, _default) when is_integer(value) and value > 0, do: min(value, 200)
 
   defp parse_limit(_, default), do: default
 end

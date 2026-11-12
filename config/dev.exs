@@ -19,8 +19,8 @@ config :xamt_bot, XamtBot.Repo,
 config :xamt_bot, XamtBotWeb.Endpoint,
   # Bind all interfaces so LAN devices can reach the dev server.
   # Use `ip: {127, 0, 0, 1}` to restrict to localhost only.
-  # Port 4001 avoids colliding with the Xamt main app (usually :4000).
-  http: [ip: {0, 0, 0, 0}, port: 4001],
+  # Port 4003 avoids colliding with the Xamt main app (usually :4000).
+  http: [ip: {0, 0, 0, 0}, port: 4003],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -54,7 +54,7 @@ config :xamt_bot, ops_token: System.get_env("OPS_TOKEN") || "dev-ops-token"
 # The `http:` config above can be replaced with:
 #
 #     https: [
-#       port: 4001,
+#       port: 4003,
 #       cipher_suite: :strong,
 #       keyfile: "priv/cert/selfsigned_key.pem",
 #       certfile: "priv/cert/selfsigned.pem"

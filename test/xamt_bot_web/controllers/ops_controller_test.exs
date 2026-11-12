@@ -30,6 +30,16 @@ defmodule XamtBotWeb.OpsControllerTest do
     refute Enum.any?(data, &Map.has_key?(&1, "signing_secret"))
   end
 
+  test "accepts lowercase bearer scheme", %{conn: conn, bot: bot} do
+    conn =
+      conn
+      |> put_req_header("authorization", "bearer test-ops-token")
+      |> get(~p"/ops/bots")
+
+    assert %{"ok" => true, "data" => data} = json_response(conn, 200)
+    assert Enum.any?(data, &(&1["id"] == bot.id))
+  end
+
   test "lists events and executions", %{conn: conn, bot: bot, event: event} do
     events_conn =
       conn
@@ -46,6 +56,31 @@ defmodule XamtBotWeb.OpsControllerTest do
       |> get(~p"/ops/executions")
 
     assert %{"ok" => true, "data" => _} = json_response(exec_conn, 200)
+  end
+
+  test "returns 404 for invalid uuid paths", %{conn: conn} do
+    bot_conn =
+      conn
+      |> put_req_header("authorization", "Bearer test-ops-token")
+      |> get(~p"/ops/bots/not-a-uuid")
+
+    assert %{"ok" => false, "error" => "not_found"} = json_response(bot_conn, 404)
+
+    event_conn =
+      build_conn()
+      |> put_req_header("authorization", "Bearer test-ops-token")
+      |> get(~p"/ops/events/123")
+
+    assert %{"ok" => false, "error" => "not_found"} = json_response(event_conn, 404)
+  end
+
+  test "ignores invalid bot_instance_id filter", %{conn: conn} do
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer test-ops-token")
+      |> get(~p"/ops/events?bot_instance_id=not-a-uuid")
+
+    assert %{"ok" => true, "data" => []} = json_response(conn, 200)
   end
 
   test "rejects missing ops token", %{conn: conn} do

@@ -121,4 +121,33 @@ defmodule XamtBot.Audit do
       idempotency_key: idempotency_key
     )
   end
+
+  def list_executions(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+    status = Keyword.get(opts, :status)
+    bot_instance_id = Keyword.get(opts, :bot_instance_id)
+
+    ExecutionLog
+    |> maybe_filter_status(status)
+    |> maybe_filter_bot(bot_instance_id)
+    |> order_by([l], desc: l.started_at)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  defp maybe_filter_status(query, nil), do: query
+  defp maybe_filter_status(query, ""), do: query
+  defp maybe_filter_status(query, status), do: from(q in query, where: q.status == ^status)
+
+  defp maybe_filter_bot(query, nil), do: query
+  defp maybe_filter_bot(query, ""), do: query
+
+  defp maybe_filter_bot(query, bot_instance_id) when is_binary(bot_instance_id) do
+    case Ecto.UUID.cast(bot_instance_id) do
+      {:ok, uuid} -> from(q in query, where: q.bot_instance_id == ^uuid)
+      :error -> from(q in query, where: false)
+    end
+  end
+
+  defp maybe_filter_bot(query, _), do: from(q in query, where: false)
 end
