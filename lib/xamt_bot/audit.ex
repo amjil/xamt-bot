@@ -3,6 +3,8 @@ defmodule XamtBot.Audit do
   Execution and outbound request logging helpers.
   """
 
+  import Ecto.Query
+
   alias XamtBot.Repo
   alias XamtBot.Audit.{ExecutionLog, OutboundRequest}
 
@@ -29,6 +31,78 @@ defmodule XamtBot.Audit do
       })
     )
     |> Repo.update()
+  end
+
+  @doc """
+  Atomically claims an outbound idempotency slot as `pending`.
+
+  Returns:
+  - `{:ok, :claimed, record}` when this caller owns the in-flight request
+  - `{:ok, :replayed, record}` when a prior call already succeeded
+  - `{:error, :in_flight}` when another caller currently holds `pending`
+  """
+  def claim_outbound(attrs) do
+    now = DateTime.utc_now()
+    bot_instance_id = Map.fetch!(attrs, :bot_instance_id)
+    idempotency_key = Map.fetch!(attrs, :idempotency_key)
+    operation = Map.fetch!(attrs, :operation)
+    target_id = Map.get(attrs, :target_id)
+
+    attrs =
+      attrs
+      |> Map.put(:status, "pending")
+      |> Map.put_new(:metadata, %{})
+
+    changeset = OutboundRequest.changeset(%OutboundRequest{}, attrs)
+
+    conflict_query =
+      from(o in OutboundRequest,
+        where: o.status == "failed",
+        update: [
+          set: [
+            status: "pending",
+            operation: ^operation,
+            target_id: ^target_id,
+            response_code: nil,
+            request_id: nil,
+            metadata: ^%{},
+            updated_at: ^now
+          ]
+        ]
+      )
+
+    case Repo.insert(changeset,
+           on_conflict: conflict_query,
+           conflict_target: [:bot_instance_id, :idempotency_key],
+           returning: true,
+           stale_error_field: :status
+         ) do
+      {:ok, record} ->
+        {:ok, :claimed, record}
+
+      {:error, %Ecto.Changeset{errors: errors} = changeset} ->
+        if stale_status_error?(errors) do
+          case get_outbound(bot_instance_id, idempotency_key) do
+            %{status: "succeeded"} = existing ->
+              {:ok, :replayed, existing}
+
+            %{status: "pending"} ->
+              {:error, :in_flight}
+
+            _other ->
+              {:error, :in_flight}
+          end
+        else
+          {:error, changeset}
+        end
+    end
+  end
+
+  defp stale_status_error?(errors) do
+    Enum.any?(errors, fn
+      {:status, {_, opts}} -> opts[:stale] == true
+      _ -> false
+    end)
   end
 
   def remember_outbound(attrs) do

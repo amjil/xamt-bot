@@ -17,8 +17,8 @@ defmodule XamtBot.Bots.BotInstance do
     field :handler_key, :string, default: "echo"
     field :status, :string, default: "active"
     field :config, :map, default: %{}
-    field :signing_secret, :string
-    field :api_token, :string
+    field :signing_secret, :string, redact: true
+    field :api_token, :string, redact: true
 
     has_many :event_inbox, XamtBot.Events.EventInbox
     has_many :execution_logs, XamtBot.Audit.ExecutionLog

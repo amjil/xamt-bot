@@ -60,6 +60,9 @@ defmodule XamtBot.Handlers.Echo do
           {:error, {:forbidden, _} = err} ->
             {:error, err}
 
+          {:error, :in_flight} ->
+            {:error, :retry, :in_flight}
+
           {:error, {:rate_limited, _} = err} ->
             {:error, :retry, err}
 

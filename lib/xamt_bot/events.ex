@@ -95,45 +95,35 @@ defmodule XamtBot.Events do
         event_type: event_type,
         bot_instance_id: bot.id,
         payload: payload,
-        status: "received",
+        status: "queued",
         received_at: now
       })
 
-    case Repo.insert(changeset) do
-      {:ok, event} ->
-        case enqueue_processor(event) do
-          {:ok, _job} ->
-            {:ok, queued} =
-              event
-              |> EventInbox.changeset(%{status: "queued"})
-              |> Repo.update()
+    Ecto.Multi.new()
+    |> Ecto.Multi.insert(:event, changeset)
+    |> Oban.insert(:job, fn %{event: event} ->
+      EventProcessor.new(%{event_inbox_id: event.id})
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{event: event}} ->
+        {:ok, :queued, event}
 
-            {:ok, :queued, queued}
-
-          {:error, reason} ->
-            Logger.error("failed to enqueue event processor",
-              event_id: event.external_event_id,
-              reason: inspect(reason)
-            )
-
-            _ = mark_failed(event, "enqueue_failed: #{inspect(reason)}")
-            {:error, :enqueue_failed}
-        end
-
-      {:error, %Ecto.Changeset{errors: errors} = changeset} ->
+      {:error, :event, %Ecto.Changeset{errors: errors} = changeset, _} ->
         if unique_event_conflict?(errors) do
-          existing = get_by_external_id(external_event_id)
-          {:ok, :duplicate, existing}
+          {:ok, :duplicate, get_by_external_id(external_event_id)}
         else
           {:error, changeset}
         end
-    end
-  end
 
-  defp enqueue_processor(%EventInbox{} = event) do
-    %{event_inbox_id: event.id}
-    |> EventProcessor.new()
-    |> Oban.insert()
+      {:error, :job, reason, _} ->
+        Logger.error("failed to enqueue event processor",
+          event_id: external_event_id,
+          reason: inspect(reason)
+        )
+
+        {:error, :enqueue_failed}
+    end
   end
 
   defp unique_event_conflict?(errors) do

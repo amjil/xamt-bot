@@ -42,10 +42,12 @@ defmodule XamtBot.Clients.XamtClient do
       |> Keyword.put_new(:target_id, channel_id)
       |> maybe_put_idempotency(body["nonce"])
 
+    encoded_channel_id = URI.encode(channel_id, &URI.char_unreserved?/1)
+
     request(
       bot,
       :post,
-      "/api/v1/bot/channels/#{channel_id}/messages",
+      "/api/v1/bot/channels/#{encoded_channel_id}/messages",
       Keyword.put(opts, :json, body)
     )
   end
@@ -64,11 +66,13 @@ defmodule XamtBot.Clients.XamtClient do
       |> then(&Keyword.merge(default_req_options(), &1))
 
     if idempotency_key do
-      case Audit.get_outbound(bot.id, idempotency_key) do
-        %{status: "succeeded"} = existing ->
-          {:ok, :replayed, existing}
-
-        _ ->
+      case Audit.claim_outbound(%{
+             bot_instance_id: bot.id,
+             idempotency_key: idempotency_key,
+             operation: operation,
+             target_id: target_id
+           }) do
+        {:ok, :claimed, _pending} ->
           do_request(
             bot,
             method,
@@ -81,6 +85,15 @@ defmodule XamtBot.Clients.XamtClient do
             idempotency_key,
             req_options
           )
+
+        {:ok, :replayed, existing} ->
+          {:ok, :replayed, existing}
+
+        {:error, :in_flight} ->
+          {:error, :in_flight}
+
+        {:error, reason} ->
+          {:error, reason}
       end
     else
       do_request(
@@ -124,7 +137,9 @@ defmodule XamtBot.Clients.XamtClient do
         url: url,
         headers: headers,
         receive_timeout: timeout,
-        redirect: false
+        redirect: false,
+        # Retry ownership belongs to Oban; avoid nested sleep/retry in-process.
+        retry: false
       ]
       |> maybe_put(:json, json)
       |> Keyword.merge(req_options)

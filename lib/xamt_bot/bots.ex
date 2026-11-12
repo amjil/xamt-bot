@@ -37,15 +37,16 @@ defmodule XamtBot.Bots do
 
   def upsert_instance(attrs) do
     attrs = stringify_keys(attrs)
-    external_bot_id = Map.fetch!(attrs, "external_bot_id")
 
-    case get_instance_by_external_id(external_bot_id) do
-      nil ->
-        create_instance(attrs)
-
-      %BotInstance{} = existing ->
-        update_instance(existing, attrs)
-    end
+    %BotInstance{}
+    |> BotInstance.changeset(attrs)
+    |> Repo.insert(
+      on_conflict:
+        {:replace,
+         [:name, :handler_key, :status, :config, :signing_secret, :api_token, :updated_at]},
+      conflict_target: :external_bot_id,
+      returning: true
+    )
   end
 
   def active?(%BotInstance{status: "active"}), do: true

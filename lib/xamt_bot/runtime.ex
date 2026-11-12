@@ -73,6 +73,9 @@ defmodule XamtBot.Runtime do
       rescue
         exception ->
           finish_retry(bot, event, log, started, Exception.message(exception))
+      catch
+        kind, reason ->
+          finish_retry(bot, event, log, started, Exception.format_banner(kind, reason))
       end
     else
       {:error, :unknown_handler} ->
