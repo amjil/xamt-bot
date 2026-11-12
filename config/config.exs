@@ -27,7 +27,8 @@ config :xamt_bot, XamtBot.Events.Signature, timestamp_tolerance_seconds: 300
 
 config :xamt_bot, XamtBot.Runtime.Registry,
   handlers: %{
-    "echo" => XamtBot.Handlers.Echo
+    "echo" => XamtBot.Handlers.Echo,
+    "nomio_review" => XamtBot.Handlers.NomioReview
   }
 
 # Configure the endpoint
