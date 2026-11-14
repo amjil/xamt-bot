@@ -26,6 +26,17 @@ defmodule XamtBot.Bots do
     end
   end
 
+  @doc """
+  Returns the first active bot registered for the given handler key.
+  """
+  def get_active_by_handler_key(handler_key) when is_binary(handler_key) do
+    BotInstance
+    |> where([b], b.handler_key == ^handler_key and b.status == "active")
+    |> order_by([b], asc: b.inserted_at)
+    |> limit(1)
+    |> Repo.one()
+  end
+
   def list_instances(opts \\ []) do
     status = Keyword.get(opts, :status)
 

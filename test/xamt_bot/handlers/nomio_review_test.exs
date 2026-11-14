@@ -23,17 +23,11 @@ defmodule XamtBot.Handlers.NomioReviewTest do
     %{bot: bot}
   end
 
-  test "forwards nomio.review.created to Xamt channel", %{bot: bot} do
+  test "forwards review.created to Xamt channel", %{bot: bot} do
     test_pid = self()
     channel_id = bot.config["default_channel_id"]
 
-    Application.put_env(:xamt_bot, XamtBot.Clients.XamtClient,
-      base_url: "http://xamt.test",
-      receive_timeout: 1_000,
-      req_options: [plug: {Req.Test, XamtBot.Clients.XamtClient}]
-    )
-
-    Req.Test.stub(XamtBot.Clients.XamtClient, fn conn ->
+    stub_xamt(fn conn ->
       {:ok, body, conn} = Plug.Conn.read_body(conn)
       send(test_pid, {:xamt_api, conn.method, conn.request_path, Jason.decode!(body)})
       Req.Test.json(conn, %{ok: true, data: %{id: Ecto.UUID.generate()}})
@@ -42,11 +36,13 @@ defmodule XamtBot.Handlers.NomioReviewTest do
     event =
       insert_event(bot, %{
         "data" => %{
-          "title" => "费用报销",
-          "submitter" => "alice",
-          "status" => "待审核",
-          "summary" => "差旅报销 1200",
-          "review_url" => "https://nomio.example/reviews/1"
+          "status" => "pending",
+          "content" => %{
+            "title" => "费用报销",
+            "author_display_name" => "alice",
+            "summary" => "差旅报销 1200",
+            "review_url" => "https://nomio.example/admin/reviews/1"
+          }
         }
       })
 
@@ -60,20 +56,14 @@ defmodule XamtBot.Handlers.NomioReviewTest do
     assert body["body"] =~ "费用报销"
     assert body["body"] =~ "alice"
     assert body["body"] =~ "差旅报销 1200"
-    assert body["body"] =~ "https://nomio.example/reviews/1"
+    assert body["body"] =~ "https://nomio.example/admin/reviews/1"
   end
 
-  test "prefers payload channel_id over bot default", %{bot: bot} do
+  test "prefers destination.channel_id over bot default", %{bot: bot} do
     test_pid = self()
     payload_channel_id = Ecto.UUID.generate()
 
-    Application.put_env(:xamt_bot, XamtBot.Clients.XamtClient,
-      base_url: "http://xamt.test",
-      receive_timeout: 1_000,
-      req_options: [plug: {Req.Test, XamtBot.Clients.XamtClient}]
-    )
-
-    Req.Test.stub(XamtBot.Clients.XamtClient, fn conn ->
+    stub_xamt(fn conn ->
       send(test_pid, {:xamt_api, conn.request_path})
       Req.Test.json(conn, %{ok: true, data: %{id: Ecto.UUID.generate()}})
     end)
@@ -81,8 +71,8 @@ defmodule XamtBot.Handlers.NomioReviewTest do
     event =
       insert_event(bot, %{
         "data" => %{
-          "channel_id" => payload_channel_id,
-          "title" => "合同审核"
+          "content" => %{"title" => "合同审核"},
+          "destination" => %{"channel_id" => payload_channel_id}
         }
       })
 
@@ -92,9 +82,44 @@ defmodule XamtBot.Handlers.NomioReviewTest do
     assert path =~ payload_channel_id
   end
 
+  test "formats review.completed with decision details", %{bot: bot} do
+    test_pid = self()
+
+    stub_xamt(fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      send(test_pid, {:xamt_body, Jason.decode!(body)})
+      Req.Test.json(conn, %{ok: true, data: %{id: Ecto.UUID.generate()}})
+    end)
+
+    event =
+      insert_event(
+        bot,
+        %{
+          "data" => %{
+            "status" => "approved",
+            "decision" => %{
+              "action" => "approve",
+              "reviewer_display_name" => "bob",
+              "reason_summary" => "符合发布要求"
+            },
+            "review_url" => "https://nomio.example/admin/reviews/2",
+            "destination" => %{"channel_id" => bot.config["default_channel_id"]}
+          }
+        },
+        "review.completed"
+      )
+
+    assert {:ok, _} = NomioReview.handle_event(bot, event)
+    assert_received {:xamt_body, body}
+    assert body["body"] =~ "审核结果"
+    assert body["body"] =~ "approve"
+    assert body["body"] =~ "bob"
+    assert body["body"] =~ "符合发布要求"
+  end
+
   test "returns missing_channel_id when neither payload nor config provides one" do
     bot = Fixtures.bot_instance_fixture(%{"handler_key" => "nomio_review", "config" => %{}})
-    event = insert_event(bot, %{"data" => %{"title" => "无频道"}})
+    event = insert_event(bot, %{"data" => %{"content" => %{"title" => "无频道"}}})
     assert {:error, :missing_channel_id} = NomioReview.handle_event(bot, event)
   end
 
@@ -104,26 +129,36 @@ defmodule XamtBot.Handlers.NomioReviewTest do
   end
 
   test "retries on rate limited responses", %{bot: bot} do
+    stub_xamt(fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(429, Jason.encode!(%{ok: false, error: "rate_limited"}))
+    end)
+
+    event =
+      insert_event(bot, %{
+        "data" => %{
+          "content" => %{"title" => "限流"},
+          "destination" => %{"channel_id" => bot.config["default_channel_id"]}
+        }
+      })
+
+    assert {:error, :retry, {:rate_limited, "rate_limited"}} =
+             NomioReview.handle_event(bot, event)
+  end
+
+  defp stub_xamt(fun) do
     Application.put_env(:xamt_bot, XamtBot.Clients.XamtClient,
       base_url: "http://xamt.test",
       receive_timeout: 1_000,
       req_options: [plug: {Req.Test, XamtBot.Clients.XamtClient}]
     )
 
-    Req.Test.stub(XamtBot.Clients.XamtClient, fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(429, Jason.encode!(%{ok: false, error: "rate_limited"}))
-    end)
-
-    event = insert_event(bot, %{"data" => %{"title" => "限流"}})
-
-    assert {:error, :retry, {:rate_limited, "rate_limited"}} =
-             NomioReview.handle_event(bot, event)
+    Req.Test.stub(XamtBot.Clients.XamtClient, fun)
   end
 
-  defp insert_event(bot, payload, type \\ "nomio.review.created") do
-    event_id = Map.get(payload, "id") || Ecto.UUID.generate()
+  defp insert_event(bot, payload, type \\ "review.created") do
+    event_id = Map.get(payload, "event_id") || Ecto.UUID.generate()
 
     {:ok, :queued, event} =
       Events.accept_delivery(bot, %{

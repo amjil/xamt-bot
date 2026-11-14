@@ -41,6 +41,16 @@ if ops_token = System.get_env("OPS_TOKEN") do
   config :xamt_bot, ops_token: ops_token
 end
 
+nomio_key_id = System.get_env("XAMT_SERVICE_KEY_ID")
+nomio_secret = System.get_env("XAMT_SERVICE_SECRET")
+
+if nomio_key_id || nomio_secret do
+  config :xamt_bot, XamtBot.Nomio,
+    service_key_id: nomio_key_id || "nomio-v1",
+    service_secret: nomio_secret,
+    service_keys: %{}
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

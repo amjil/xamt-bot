@@ -25,6 +25,11 @@ config :xamt_bot, XamtBot.Clients.XamtClient,
 
 config :xamt_bot, XamtBot.Events.Signature, timestamp_tolerance_seconds: 300
 
+config :xamt_bot, XamtBot.Nomio,
+  service_key_id: nil,
+  service_secret: nil,
+  service_keys: %{}
+
 config :xamt_bot, XamtBot.Runtime.Registry,
   handlers: %{
     "echo" => XamtBot.Handlers.Echo,

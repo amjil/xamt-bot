@@ -31,6 +31,11 @@ config :xamt_bot, XamtBot.Clients.XamtClient,
 
 config :xamt_bot, XamtBot.Events.Signature, timestamp_tolerance_seconds: 300
 
+config :xamt_bot, XamtBot.Nomio,
+  service_key_id: "nomio-v1",
+  service_secret: "dev-nomio-xamt-secret",
+  service_keys: %{}
+
 config :xamt_bot, ops_token: "test-ops-token"
 
 # Initialize plugs at runtime for faster test compilation

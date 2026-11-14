@@ -29,6 +29,7 @@ defmodule XamtBotWeb.Router do
 
     get "/health", HealthController, :show
     post "/webhooks/xamt/:external_bot_id", WebhookController, :xamt
+    post "/webhooks/nomio/reviews", WebhookController, :nomio_reviews
   end
 
   # Read-only ops surface. Requires OPS_TOKEN / :ops_token; otherwise 404.

@@ -38,6 +38,12 @@ config :xamt_bot, XamtBot.Events.Signature,
   timestamp_tolerance_seconds:
     String.to_integer(System.get_env("WEBHOOK_TIMESTAMP_TOLERANCE") || "300")
 
+# Nomio → xamt-bot service auth. Must match Nomio's XAMT_SERVICE_* values.
+config :xamt_bot, XamtBot.Nomio,
+  service_key_id: System.get_env("XAMT_SERVICE_KEY_ID") || "nomio-v1",
+  service_secret: System.get_env("XAMT_SERVICE_SECRET") || "dev-nomio-xamt-secret",
+  service_keys: %{}
+
 # Local ops browsing. Override with OPS_TOKEN in the environment.
 config :xamt_bot, ops_token: System.get_env("OPS_TOKEN") || "dev-ops-token"
 

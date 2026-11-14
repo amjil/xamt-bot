@@ -68,6 +68,8 @@ defmodule XamtBotWeb.OpsController do
       handler_key: bot.handler_key,
       status: bot.status,
       webhook_path: "/webhooks/xamt/#{bot.external_bot_id}",
+      nomio_webhook_path:
+        if(bot.handler_key == "nomio_review", do: "/webhooks/nomio/reviews", else: nil),
       inserted_at: bot.inserted_at,
       updated_at: bot.updated_at
     }
